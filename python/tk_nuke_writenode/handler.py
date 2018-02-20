@@ -204,7 +204,7 @@ class TankWriteNodeHandler(object):
         """
         Reset the render path of the specified node.  This
         will force the render path to be updated based on
-        the current script path and configuraton
+        the current script path and configuration
         """
         is_proxy = node.proxy()
         self.__update_render_path(node, force_reset=True, is_proxy=is_proxy)     
@@ -1023,12 +1023,15 @@ class TankWriteNodeHandler(object):
         publish_template = self._app.get_template_by_name(profile["publish_template"])
         proxy_render_template = self._app.get_template_by_name(profile["proxy_render_template"])
         proxy_publish_template = self._app.get_template_by_name(profile["proxy_publish_template"])
-        file_type = profile["file_type"]
         file_settings = profile["settings"]
         tile_color = profile["tile_color"]
         use_node_name = profile["use_node_name"]
         tank_channel = profile["tank_channel"]
         promote_write_knobs = profile.get("promote_write_knobs", [])
+
+        # translate profile extension to nuke extension
+        extension_choices = render_template.keys["extension"].labelled_choices
+        file_type = extension_choices[profile["file_type"]]
 
         # If the profile hasn't changed, just apply cached file format settings
         if profile_name == old_profile_name:
@@ -1397,7 +1400,7 @@ class TankWriteNodeHandler(object):
             cache_entry = None
             try:
                 # gather the render settings to use when computing the path:
-                render_template, width, height, output_name = self.__gather_render_settings(node, is_proxy)
+                render_template, width, height, output_name, extension = self.__gather_render_settings(node, is_proxy)
                 
                 # experimental settings cache to avoid re-computing the path if nothing has changed...
                 cache_item = self.__node_computed_path_settings_cache.get((node, is_proxy), (None, "", ""))
@@ -1407,6 +1410,7 @@ class TankWriteNodeHandler(object):
                     "width":width,
                     "height":height,
                     "output":output_name,
+                    "extension": extension,
                     "script_path":script_path
                 }
                 
@@ -1417,7 +1421,7 @@ class TankWriteNodeHandler(object):
                         raise TkComputePathError(compute_path_error)
                 else:
                     # compute the render path:
-                    render_path = self.__compute_render_path_from(node, render_template, width, height, output_name)
+                    render_path = self.__compute_render_path_from(node, render_template, width, height, output_name, extension)
                     
             except TkComputePathError, e:
                 # update cache:
@@ -1654,8 +1658,17 @@ class TankWriteNodeHandler(object):
             # check for 'channel' for backwards compatibility
             if "output" in render_template.keys or "channel" in render_template.keys:
                 output_name = node.knob(TankWriteNodeHandler.OUTPUT_KNOB_NAME).value()
-            
-        return (render_template, width, height, output_name)
+
+        # extension = node.knob('tk_file_type').value()
+
+        # decode extension from profile['file_type']
+        # this feels like a bad way because __apply_cached_file_format_settings()
+        # resets render_path (which is not cached) and extension reverts to default value
+        profile_name = node.knob('profile_name').value()
+        profile = self._profiles.get(profile_name, {})
+        extension = profile.get('file_type')
+
+        return (render_template, width, height, output_name, extension)
 
 
     def __compute_render_path(self, node, is_proxy=False):
@@ -1668,12 +1681,12 @@ class TankWriteNodeHandler(object):
         """
         
         # gather the render settings to use:
-        render_template, width, height, output_name = self.__gather_render_settings(node, is_proxy)
+        render_template, width, height, output_name, extension = self.__gather_render_settings(node, is_proxy)
 
         # compute the render path:
-        return self.__compute_render_path_from(node, render_template, width, height, output_name)
+        return self.__compute_render_path_from(node, render_template, width, height, output_name, extension)
 
-    def __compute_render_path_from(self, node, render_template, width, height, output_name):
+    def __compute_render_path_from(self, node, render_template, width, height, output_name, extension):
         """
         Computes the render path for a node using the specified settings
 
@@ -1731,8 +1744,10 @@ class TankWriteNodeHandler(object):
                 else:
                     if not render_template.keys[key_name].validate(output_name):                
                         raise TkComputePathError("The output name '%s' contains illegal characters!" % output_name)
-                    fields[key_name] = output_name            
-         
+                    fields[key_name] = output_name
+
+        fields["extension"] = extension
+
         # update with additional fields from the context:       
         fields.update(self._app.context.as_template_fields(render_template))
 
