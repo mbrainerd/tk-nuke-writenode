@@ -20,7 +20,9 @@ configuration:
                      are supported in this configuration. Each dictionary entry needs to have
                      the following keys: 'name' - a descriptive name for this node. 'file_type' -
                      the file type to use for the renders (exr, cin, dpx etc). This will be
-                     passed to the Nuke write node when rendering. 'settings' - configuration
+                     passed to the Nuke write node when rendering. 'file_extension' - optional
+                     key to specify file extension if it is different from file_type (e.g. jpg
+                     as opposed to jpeg or tif as opposed to tiff). 'settings' - configuration
                      settings for the given file type, as a dictionary. This too will be
                      passed to the write node when rendering. Next, you need two entries
                      named 'render_template' and 'publish_template'
@@ -44,6 +46,9 @@ configuration:
                     type: str
                 file_type:
                     type: str
+                file_extension:
+                    type: str
+                    default_value: ''
                 settings:
                     type: dict
                 tank_type:

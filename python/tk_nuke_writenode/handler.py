@@ -1023,15 +1023,12 @@ class TankWriteNodeHandler(object):
         publish_template = self._app.get_template_by_name(profile["publish_template"])
         proxy_render_template = self._app.get_template_by_name(profile["proxy_render_template"])
         proxy_publish_template = self._app.get_template_by_name(profile["proxy_publish_template"])
+        file_type = profile["file_type"]
         file_settings = profile["settings"]
         tile_color = profile["tile_color"]
         use_node_name = profile["use_node_name"]
         tank_channel = profile["tank_channel"]
         promote_write_knobs = profile.get("promote_write_knobs", [])
-
-        # translate profile extension to nuke extension
-        extension_choices = render_template.keys["extension"].labelled_choices
-        file_type = extension_choices[profile["file_type"]]
 
         # If the profile hasn't changed, just apply cached file format settings
         if profile_name == old_profile_name:
@@ -1661,12 +1658,14 @@ class TankWriteNodeHandler(object):
 
         # extension = node.knob('tk_file_type').value()
 
-        # decode extension from profile['file_type']
-        # this feels like a bad way because __apply_cached_file_format_settings()
-        # resets render_path (which is not cached) and extension reverts to default value
+        # decode extension from profile['file_extension']
+        # File open fires knob changed callbacks which call this even if path is cached.
+        # This is a problem if we are trying to restore settings
+        # of a node whose profile has been deleted.
+        # Setting extension to file_type in that case.
         profile_name = node.knob('profile_name').value()
         profile = self._profiles.get(profile_name, {})
-        extension = profile.get('file_type')
+        extension = profile.get('file_extension') or node.knob('tk_file_type').value()
 
         return (render_template, width, height, output_name, extension)
 
@@ -1952,7 +1951,7 @@ class TankWriteNodeHandler(object):
                     return
             
                 # propogate the value:
-                self._app.log_debug("Propogating value for '%s.%s' to '%s.%s.%s'" 
+                self._app.log_debug("Propogating value for '%s.%s' to '%s.%s.%s'"
                                     % (grp.name(), knob_name, grp.name(), write_node.name(), knob_name))
                 
                 write_node.knob(knob_name).setValue(nuke.thisKnob().value())
