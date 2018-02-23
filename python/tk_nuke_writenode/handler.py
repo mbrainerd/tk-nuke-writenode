@@ -204,7 +204,7 @@ class TankWriteNodeHandler(object):
         """
         Reset the render path of the specified node.  This
         will force the render path to be updated based on
-        the current script path and configuraton
+        the current script path and configuration
         """
         is_proxy = node.proxy()
         self.__update_render_path(node, force_reset=True, is_proxy=is_proxy)     
@@ -1024,6 +1024,7 @@ class TankWriteNodeHandler(object):
         proxy_render_template = self._app.get_template_by_name(profile["proxy_render_template"])
         proxy_publish_template = self._app.get_template_by_name(profile["proxy_publish_template"])
         file_type = profile["file_type"]
+        file_extension = profile["file_extension"] or profile["file_type"]
         file_settings = profile["settings"]
         tile_color = profile["tile_color"]
         use_node_name = profile["use_node_name"]
@@ -1075,6 +1076,7 @@ class TankWriteNodeHandler(object):
         # cache the type and settings on the root node so that 
         # they get serialized with the script:
         self.__update_knob_value(node, "tk_file_type", file_type)
+        self.__update_knob_value(node, "tk_file_extension", file_extension)
         self.__update_knob_value(node, "tk_file_type_settings", pickle.dumps(file_settings))
 
         # write the template name to the node so that we know it later
@@ -1397,7 +1399,7 @@ class TankWriteNodeHandler(object):
             cache_entry = None
             try:
                 # gather the render settings to use when computing the path:
-                render_template, width, height, output_name = self.__gather_render_settings(node, is_proxy)
+                render_template, width, height, output_name, extension = self.__gather_render_settings(node, is_proxy)
                 
                 # experimental settings cache to avoid re-computing the path if nothing has changed...
                 cache_item = self.__node_computed_path_settings_cache.get((node, is_proxy), (None, "", ""))
@@ -1407,6 +1409,7 @@ class TankWriteNodeHandler(object):
                     "width":width,
                     "height":height,
                     "output":output_name,
+                    "extension": extension,
                     "script_path":script_path
                 }
                 
@@ -1417,7 +1420,7 @@ class TankWriteNodeHandler(object):
                         raise TkComputePathError(compute_path_error)
                 else:
                     # compute the render path:
-                    render_path = self.__compute_render_path_from(node, render_template, width, height, output_name)
+                    render_path = self.__compute_render_path_from(node, render_template, width, height, output_name, extension)
                     
             except TkComputePathError, e:
                 # update cache:
@@ -1628,7 +1631,7 @@ class TankWriteNodeHandler(object):
         
         :param node:         The current Shotgun Write node
         :param is_proxy:     If True then compute the proxy path, otherwise compute the standard render path
-        :returns:            Tuple containing (render template, width, height, output name)
+        :returns:            Tuple containing (render template, width, height, output name, extension)
         """
         render_template = self.__get_render_template(node, is_proxy)
         width = height = 0
@@ -1654,8 +1657,10 @@ class TankWriteNodeHandler(object):
             # check for 'channel' for backwards compatibility
             if "output" in render_template.keys or "channel" in render_template.keys:
                 output_name = node.knob(TankWriteNodeHandler.OUTPUT_KNOB_NAME).value()
-            
-        return (render_template, width, height, output_name)
+
+        extension = node.knob('tk_file_extension').value()
+
+        return (render_template, width, height, output_name, extension)
 
 
     def __compute_render_path(self, node, is_proxy=False):
@@ -1668,12 +1673,12 @@ class TankWriteNodeHandler(object):
         """
         
         # gather the render settings to use:
-        render_template, width, height, output_name = self.__gather_render_settings(node, is_proxy)
+        render_template, width, height, output_name, extension = self.__gather_render_settings(node, is_proxy)
 
         # compute the render path:
-        return self.__compute_render_path_from(node, render_template, width, height, output_name)
+        return self.__compute_render_path_from(node, render_template, width, height, output_name, extension)
 
-    def __compute_render_path_from(self, node, render_template, width, height, output_name):
+    def __compute_render_path_from(self, node, render_template, width, height, output_name, extension):
         """
         Computes the render path for a node using the specified settings
 
@@ -1682,6 +1687,7 @@ class TankWriteNodeHandler(object):
         :param width:              The width of the rendered images
         :param height:             The height of the rendered images
         :param output_name:        The toolkit output name specified by the user for this node
+        :param extension:          The image file extension that needs to be used
         :returns:                  The computed render path        
         """
 
@@ -1731,8 +1737,10 @@ class TankWriteNodeHandler(object):
                 else:
                     if not render_template.keys[key_name].validate(output_name):                
                         raise TkComputePathError("The output name '%s' contains illegal characters!" % output_name)
-                    fields[key_name] = output_name            
-         
+                    fields[key_name] = output_name
+
+        fields["extension"] = extension
+
         # update with additional fields from the context:       
         fields.update(self._app.context.as_template_fields(render_template))
 
@@ -1937,7 +1945,7 @@ class TankWriteNodeHandler(object):
                     return
             
                 # propogate the value:
-                self._app.log_debug("Propogating value for '%s.%s' to '%s.%s.%s'" 
+                self._app.log_debug("Propogating value for '%s.%s' to '%s.%s.%s'"
                                     % (grp.name(), knob_name, grp.name(), write_node.name(), knob_name))
                 
                 write_node.knob(knob_name).setValue(nuke.thisKnob().value())
