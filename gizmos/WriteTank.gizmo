@@ -115,7 +115,13 @@ Gizmo {
     l "File Type"
     t "The file type to be used for the write node output - this cached value is used if the profile can't be determined"
     +INVISIBLE
- } 
+ }
+ addUserKnob {
+    1 tk_file_extension
+    l "File Extension"
+    t "The extension to be used for the output file - this cached value is used if the profile can't be determined"
+    +INVISIBLE
+ }
  addUserKnob {
     1 tk_file_type_settings
     l "File Type Settings"

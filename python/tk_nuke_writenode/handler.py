@@ -1024,6 +1024,7 @@ class TankWriteNodeHandler(object):
         proxy_render_template = self._app.get_template_by_name(profile["proxy_render_template"])
         proxy_publish_template = self._app.get_template_by_name(profile["proxy_publish_template"])
         file_type = profile["file_type"]
+        file_extension = profile["file_extension"] or profile["file_type"]
         file_settings = profile["settings"]
         tile_color = profile["tile_color"]
         use_node_name = profile["use_node_name"]
@@ -1075,6 +1076,7 @@ class TankWriteNodeHandler(object):
         # cache the type and settings on the root node so that 
         # they get serialized with the script:
         self.__update_knob_value(node, "tk_file_type", file_type)
+        self.__update_knob_value(node, "tk_file_extension", file_extension)
         self.__update_knob_value(node, "tk_file_type_settings", pickle.dumps(file_settings))
 
         # write the template name to the node so that we know it later
@@ -1629,7 +1631,7 @@ class TankWriteNodeHandler(object):
         
         :param node:         The current Shotgun Write node
         :param is_proxy:     If True then compute the proxy path, otherwise compute the standard render path
-        :returns:            Tuple containing (render template, width, height, output name)
+        :returns:            Tuple containing (render template, width, height, output name, extension)
         """
         render_template = self.__get_render_template(node, is_proxy)
         width = height = 0
@@ -1656,16 +1658,7 @@ class TankWriteNodeHandler(object):
             if "output" in render_template.keys or "channel" in render_template.keys:
                 output_name = node.knob(TankWriteNodeHandler.OUTPUT_KNOB_NAME).value()
 
-        # extension = node.knob('tk_file_type').value()
-
-        # decode extension from profile['file_extension']
-        # File open fires knob changed callbacks which call this even if path is cached.
-        # This is a problem if we are trying to restore settings
-        # of a node whose profile has been deleted.
-        # Setting extension to file_type in that case.
-        profile_name = node.knob('profile_name').value()
-        profile = self._profiles.get(profile_name, {})
-        extension = profile.get('file_extension') or node.knob('tk_file_type').value()
+        extension = node.knob('tk_file_extension').value()
 
         return (render_template, width, height, output_name, extension)
 
@@ -1694,6 +1687,7 @@ class TankWriteNodeHandler(object):
         :param width:              The width of the rendered images
         :param height:             The height of the rendered images
         :param output_name:        The toolkit output name specified by the user for this node
+        :param extension:          The image file extension that needs to be used
         :returns:                  The computed render path        
         """
 
