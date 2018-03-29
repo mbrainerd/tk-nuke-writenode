@@ -1659,6 +1659,8 @@ class TankWriteNodeHandler(object):
                 output_name = node.knob(TankWriteNodeHandler.OUTPUT_KNOB_NAME).value()
 
         extension = node.knob('tk_file_extension').value()
+        if not extension:
+            extension = node.knob('tk_file_type').value()
 
         return (render_template, width, height, output_name, extension)
 
