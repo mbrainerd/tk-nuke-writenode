@@ -1398,8 +1398,9 @@ class TankWriteNodeHandler(object):
     
             # get the current script path:
             script_path = self.__get_current_script_path()
-                
-            reset_path_button_visible = False
+
+            # this button should always be visible now!
+            reset_path_button_visible = True
             path_warning = ""
             render_path = None
             cache_entry = None
