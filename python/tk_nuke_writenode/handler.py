@@ -56,6 +56,7 @@ class TankWriteNodeHandler(object):
         
         self.__currently_rendering_nodes = set()
         self.__node_computed_path_settings_cache = {}
+        self.__node_computed_size_settings_cache = {}
         self.__path_preview_cache = {}
         # flags to track when the render and proxy paths are being updated.
         self.__is_updating_render_path = False
@@ -207,6 +208,11 @@ class TankWriteNodeHandler(object):
         the current script path and configuration
         """
         is_proxy = node.proxy()
+        # delete the old size cache dict and leave with a new one
+        if self.__node_computed_size_settings_cache:
+            del self.__node_computed_size_settings_cache
+        self.__node_computed_size_settings_cache = {}
+
         self.__update_render_path(node, force_reset=True, is_proxy=is_proxy)     
         self.__update_render_path(node, force_reset=True, is_proxy=(not is_proxy))
 
@@ -1392,8 +1398,9 @@ class TankWriteNodeHandler(object):
     
             # get the current script path:
             script_path = self.__get_current_script_path()
-                
-            reset_path_button_visible = False
+
+            # this button should always be visible now!
+            reset_path_button_visible = True
             path_warning = ""
             render_path = None
             cache_entry = None
@@ -1403,6 +1410,7 @@ class TankWriteNodeHandler(object):
                 
                 # experimental settings cache to avoid re-computing the path if nothing has changed...
                 cache_item = self.__node_computed_path_settings_cache.get((node, is_proxy), (None, "", ""))
+
                 old_cache_entry, compute_path_error, render_path = cache_item
                 cache_entry = {
                     "ctx":self._app.context,
@@ -1602,24 +1610,24 @@ class TankWriteNodeHandler(object):
     
             # proxy format
             proxy_format = root.knob("proxy_format").value()
-            proxy_w  = proxy_format.width()
-            proxy_h  = proxy_format.height()
+            proxy_w = proxy_format.width()
+            proxy_h = proxy_format.height()
             proxy_aspect = proxy_format.pixelAspect()
         
             # calculate scales and offsets required:
             scale_x = float(proxy_w)/float(root_w)
             scale_y = scale_x * (proxy_aspect/root_aspect)
     
-            offset_x = 0.0 # this always seems to be 0.0...
+            offset_x = 0.0  # this always seems to be 0.0...
             offset_y = (((proxy_h/scale_y) - root_h) * scale_y)/2.0
         else:
             # unexpected type!
             pass
     
         # calculate the scaled format for the node:
-        scaled_format = node.format().scaled(scale_x,scale_y,offset_x,offset_y)
+        scaled_format = node.format().scaled(scale_x, scale_y, offset_x, offset_y)
                 
-        #print ("sx:", scale_x, "sy:", scale_y, "tx:", offset_x, "ty:", offset_y, 
+        # print ("sx:", scale_x, "sy:", scale_y, "tx:", offset_x, "ty:", offset_y,
         #        "w:", scaled_format.width(), "h:", scaled_format.height())
         return (scaled_format.width(), scaled_format.height())
         
@@ -1636,22 +1644,37 @@ class TankWriteNodeHandler(object):
         render_template = self.__get_render_template(node, is_proxy)
         width = height = 0
         output_name = ""
-        
-        if is_proxy:
-            if not render_template:
-                # we don't have a proxy template so fall back to render template.
-                # there will be a warning in the UI for this
-                #
-                # Note: to retain backwards compatibility, if no proxy template has
-                # been specified then the full-res dimensions will be used instead
-                # of the proxy dimensions.
-                return self.__gather_render_settings(node, False)
-            
-            # width & height are set to the proxy dimensions:
-            width, height = self.__calculate_proxy_dimensions(node)
+
+        # get the cached sizes for the following node
+        size_cache_item = self.__node_computed_size_settings_cache.get((node, is_proxy), (None, None))
+
+        cached_width, cached_height = size_cache_item
+        # check if the cached sizes have any values
+        if cached_width and cached_height:
+            width = cached_width
+            height = cached_height
+        # cache out the sizes so we don't have to compute these again
         else:
-            # width & height are set to the node's dimensions:
-            width, height = node.width(), node.height()
+            if is_proxy:
+                if not render_template:
+                    # we don't have a proxy template so fall back to render template.
+                    # there will be a warning in the UI for this
+                    #
+                    # Note: to retain backwards compatibility, if no proxy template has
+                    # been specified then the full-res dimensions will be used instead
+                    # of the proxy dimensions.
+                    return self.__gather_render_settings(node, False)
+
+                # width & height are set to the proxy dimensions:
+                width, height = self.__calculate_proxy_dimensions(node)
+            else:
+                # width & height are set to the node's dimensions:
+                width, height = node.width(), node.height()
+
+            # cache out the sizes so we don't have to compute these again
+            # this will introduce one bottle neck where the user will have to use diff write nodes for diff resolutions.
+            # reset path will anyways reset any of these size caches!
+            self.__node_computed_size_settings_cache[(node, is_proxy)] = (width, height)
         
         if render_template:
             # check for 'channel' for backwards compatibility
