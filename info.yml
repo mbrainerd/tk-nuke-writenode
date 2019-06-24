@@ -49,6 +49,10 @@ configuration:
                 file_extension:
                     type: str
                     default_value: ''
+                node_class:
+                    type: str
+                    default_value: Write
+                    description: Class of nuke node to be created.
                 settings:
                     type: dict
                 tank_type:

@@ -32,7 +32,10 @@ class TankWriteNodeHandler(object):
     Handles requests and processing from a tank write node.
     """
 
-    SG_WRITE_NODE_CLASS = "WriteTank"
+    NUKE_TO_SG_CLASS_MAPPING = {
+        "Write": "WriteTank",
+        "DeepWrite": "DeepWriteTank",
+    }
     SG_WRITE_DEFAULT_NAME = "ShotgunWrite"
     WRITE_NODE_NAME = "Write1"
 
@@ -105,9 +108,12 @@ class TankWriteNodeHandler(object):
         Returns a list of tank write nodes
         """
         if nuke.exists("root"):
-            return nuke.allNodes(group=nuke.root(), 
-                                 filter=TankWriteNodeHandler.SG_WRITE_NODE_CLASS, 
-                                 recurseGroups = True)
+            tank_write_nodes = []
+            for write_class in TankWriteNodeHandler.NUKE_TO_SG_CLASS_MAPPING.values():
+                tank_write_nodes.extend(nuke.allNodes(group=nuke.root(),
+                                                      filter=write_class,
+                                                      recurseGroups = True))
+            return tank_write_nodes
         else:
             return []
             
@@ -234,7 +240,13 @@ class TankWriteNodeHandler(object):
             return
 
         # new node please!
-        node = nuke.createNode(TankWriteNodeHandler.SG_WRITE_NODE_CLASS)
+        profile = self._profiles[profile_name]
+        node_class = TankWriteNodeHandler.NUKE_TO_SG_CLASS_MAPPING.get(profile["node_class"])
+        if not node_class:
+            nuke.message("No Shotgun node configured for nuke node class: {}".format(profile["node_class"]))
+            return
+
+        node = nuke.createNode(node_class)
 
         # rename to our new default name:
         existing_node_names = [n.name() for n in nuke.allNodes()]
@@ -358,7 +370,8 @@ class TankWriteNodeHandler(object):
         
         # user create callback that gets executed whenever a Shotgun Write Node
         # is created by the user
-        nuke.addOnUserCreate(self.__on_user_create, nodeClass=TankWriteNodeHandler.SG_WRITE_NODE_CLASS)
+        for write_class in TankWriteNodeHandler.NUKE_TO_SG_CLASS_MAPPING.values():
+            nuke.addOnUserCreate(self.__on_user_create, nodeClass=write_class)
 
         # set up all existing nodes:
         for n in self.get_nodes():
@@ -370,7 +383,8 @@ class TankWriteNodeHandler(object):
         """
         nuke.removeOnScriptLoad(self.process_placeholder_nodes, nodeClass="Root")
         nuke.removeOnScriptSave(self.__on_script_save)
-        nuke.removeOnUserCreate(self.__on_user_create, nodeClass=TankWriteNodeHandler.SG_WRITE_NODE_CLASS)
+        for write_class in TankWriteNodeHandler.NUKE_TO_SG_CLASS_MAPPING.values():
+            nuke.removeOnUserCreate(self.__on_user_create, nodeClass=write_class)
 
     def convert_sg_to_nuke_write_nodes(self):
         """
@@ -497,9 +511,13 @@ class TankWriteNodeHandler(object):
         nukescripts.clear_selection_recursive()
         
         # get write nodes:
-        write_nodes = nuke.allNodes(group=nuke.root(), filter="Write", recurseGroups = True)
+        write_nodes = []
+        for nuke_write_class in TankWriteNodeHandler.NUKE_TO_SG_CLASS_MAPPING:
+            write_nodes.extend(nuke.allNodes(group=nuke.root(), filter=nuke_write_class,
+                                             recurseGroups = True))
+
         for wn in write_nodes:
-        
+
             # look for additional toolkit knobs:
             profile_knob = wn.knob("tk_profile_name")
             output_knob = wn.knob("tk_output")
@@ -525,7 +543,7 @@ class TankWriteNodeHandler(object):
             node_pos = (wn.xpos(), wn.ypos())
             
             # create new Shotgun Write node:
-            new_sg_wn = nuke.createNode(TankWriteNodeHandler.SG_WRITE_NODE_CLASS)
+            new_sg_wn = nuke.createNode(TankWriteNodeHandler.NUKE_TO_SG_CLASS_MAPPING[wn.Class()])
             new_sg_wn.setSelected(False)
 
             # copy across file & proxy knobs as well as all cached templates:
@@ -1026,6 +1044,18 @@ class TankWriteNodeHandler(object):
             self.__apply_cached_file_format_settings(node)            
             return
 
+        # prevent write profiles being applied for deep write and vice-versa
+        sg_node_class = TankWriteNodeHandler.NUKE_TO_SG_CLASS_MAPPING.get(profile["node_class"])
+        if node.Class() != sg_node_class:
+            error_message = "Cannot set profile '{}' for node '{}' as it is of class {}!" .format(profile_name, node.name(), node.Class())
+            self._app.log_error(error_message)
+            nuke.message(error_message)
+
+            # reset knob
+            old_profile_name = node.knob("profile_name").value()
+            self.__update_knob_value(node, "tk_profile_list", old_profile_name)
+            return
+
         self._app.log_debug("Changing the profile for node '%s' to: %s" % (node.name(), profile_name))
 
         # keep track of the old profile name:
@@ -1337,7 +1367,7 @@ class TankWriteNodeHandler(object):
         
         # update output knob:
         self.__update_knob_value(node, TankWriteNodeHandler.OUTPUT_KNOB_NAME, output_name)
-        
+
         # reset the render path:
         self.reset_render_path(node)
 
@@ -1881,8 +1911,10 @@ class TankWriteNodeHandler(object):
         
         reset_all_profile_settings = False
         if not current_profile_name:
-            # default to first profile:
-            current_profile_name = node.knob("tk_profile_list").value()
+            # default to first profile where node class matches ours:
+            for profile in self._profiles.values():
+                if node.Class() == TankWriteNodeHandler.NUKE_TO_SG_CLASS_MAPPING[profile["node_class"]]:
+                    current_profile_name = profile["name"]
             # and as this node has never had a profile set, lets make
             # sure we reset all settings 
             reset_all_profile_settings = True 
@@ -2110,12 +2142,3 @@ class TankWriteNodeHandler(object):
         # populate the initial output name based on the render template:
         render_template = self.get_render_template(node)
         self.__populate_initial_output_name(render_template, node)
-
-
-
-
-
-
-
-        
-        
