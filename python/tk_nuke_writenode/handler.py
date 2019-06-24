@@ -205,7 +205,7 @@ class TankWriteNodeHandler(object):
         """
         Reset the render path of the specified node.  This
         will force the render path to be updated based on
-        the current script path and configuration
+        the current script path and configuration.
         """
         is_proxy = node.proxy()
         # delete the old size cache dict and leave with a new one
@@ -213,7 +213,7 @@ class TankWriteNodeHandler(object):
             del self.__node_computed_size_settings_cache
         self.__node_computed_size_settings_cache = {}
 
-        self.__update_render_path(node, force_reset=True, is_proxy=is_proxy)     
+        self.__update_render_path(node, force_reset=True, is_proxy=is_proxy)
         self.__update_render_path(node, force_reset=True, is_proxy=(not is_proxy))
 
     def create_new_node(self, profile_name):
@@ -362,7 +362,7 @@ class TankWriteNodeHandler(object):
 
         # set up all existing nodes:
         for n in self.get_nodes():
-            self.__setup_new_node(n)
+            self.setup_new_node(n)
         
     def remove_callbacks(self):
         """
@@ -602,7 +602,7 @@ class TankWriteNodeHandler(object):
         # alone from now on, unless we someday have a better understanding of
         # what's going on and the consequences of changing the on_node_created
         # behavior.
-        self.__setup_new_node(nuke.thisNode())
+        self.setup_new_node(nuke.thisNode())
 
     def on_compute_path_gizmo_callback(self):
         """
@@ -996,7 +996,7 @@ class TankWriteNodeHandler(object):
                               % node.name(), e)
         
         # update the node:
-        self.__populate_format_settings(node, file_type, file_settings, False, promoted_knobs)        
+        self.__populate_format_settings(node, file_type, file_settings, False, promoted_knobs)
         
 
     def __set_profile(self, node, profile_name, reset_all_settings=False):
@@ -1076,7 +1076,7 @@ class TankWriteNodeHandler(object):
         # update the output tank channel
         self.__update_knob_value(node, TankWriteNodeHandler.OUTPUT_KNOB_NAME, output_name)
         self.__update_knob_value(node, TankWriteNodeHandler.USE_NAME_AS_OUTPUT_KNOB_NAME, use_node_name)
-        
+
         # set the format
         self.__populate_format_settings(
             node,
@@ -1437,7 +1437,7 @@ class TankWriteNodeHandler(object):
                     # compute the render path:
                     render_path = self.__compute_render_path_from(node, render_template, width, height, output_name, extension)
                     
-            except TkComputePathError, e:
+            except TkComputePathError as e:
                 # update cache:
                 self.__node_computed_path_settings_cache[(node, is_proxy)] = (cache_entry, str(e), "")
                 
@@ -1720,7 +1720,7 @@ class TankWriteNodeHandler(object):
         :param height:             The height of the rendered images
         :param output_name:        The toolkit output name specified by the user for this node
         :param extension:          The image file extension that needs to be used
-        :returns:                  The computed render path        
+        :returns:                  The computed render path
         """
 
         # make sure we have a valid template:
@@ -1835,8 +1835,8 @@ class TankWriteNodeHandler(object):
                             break
                         
         return path_is_locked     
-                
-    def __setup_new_node(self, node):
+
+    def setup_new_node(self, node):
         """
         Setup a node when it's created (either directly or as a result of loading a script).
         This allows us to dynamically populate the profile list.
@@ -2105,7 +2105,7 @@ class TankWriteNodeHandler(object):
             return
         
         # setup the new node:
-        self.__setup_new_node(node)
+        self.setup_new_node(node)
         
         # populate the initial output name based on the render template:
         render_template = self.get_render_template(node)
