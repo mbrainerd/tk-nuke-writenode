@@ -1,6 +1,5 @@
-#! /dd/tools/cent6_64/package/nuke/11.2v1/libnuke-11.2.1.so -nx
-#write_info create_thumbnail file:"" format:"800 422 1" chans:":rgba.red:rgba.green:rgba.blue:rgba.alpha:depth.Z:deep.front:deep.back:" framerange:"1009 1181" fps:"24" colorspace:"default" datatype:"8 bit" transfer:"unknown" views:"main" timecode:"20:01:23:16" colorManagement:"OCIO"
-version 11.2 v1
+#! /Applications/Nuke6.3v4/Nuke6.3v4.app/Contents/MacOS/Nuke6.3v4 -nx
+version 6.3
 
 ##########################################################################################
 ##########################################################################################
